@@ -1,3 +1,9 @@
 [submodule "ML-From-Scratch"]
 	path = ML-From-Scratch
 	url = https://github.com/eriklindernoren/ML-From-Scratch.git
+[submodule "scikit-learn"]
+	path = scikit-learn
+	url = https://github.com/scikit-learn/scikit-learn.git
+[submodule "numpy-ml"]
+	path = numpy-ml
+	url = https://github.com/ddbourgin/numpy-ml.git
