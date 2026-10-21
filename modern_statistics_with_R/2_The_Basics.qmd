@@ -1,0 +1,515 @@
+---
+title: "2_The_Basics"
+format: html
+---
+
+# Descriptive Statistics
+
+## 1. Structure of the data frame
+
+| Function | Returns | Example |
+|----|----|----|
+| `head(df, n = 6)` | first n rows (default 6) | `head(msleep, 10)` |
+| `tail(df, n = 6)` | last n rows | `tail(msleep)` |
+| `dim(df)` | `c(nrow, ncol)` | `dim(msleep)` → `83 11` |
+| `nrow(df)`, `ncol(df)` | rows or columns alone | `nrow(msleep)` |
+| `str(df)` | type of each variable, first values, dimensions | `str(msleep)` |
+| `names(df)` | character vector of variable names | `names(msleep)` |
+| `summary(df)` | per-column summary (numeric: min/quartiles/mean/max/NA count; factor: counts) | `summary(msleep)` |
+
+- Access a column with `df$var` (e.g. `msleep$sleep_total`).
+- `names(df)` ≡ `colnames(df)` for data frames. Both can also be used to rename: `names(df)[2] <- "new"`.
+- For tibbles, `glimpse(df)` (dplyr) is a more compact alternative to `str()`.
+
+## 2. Numerical data
+
+| Function                   | Statistic                                |
+|----------------------------|------------------------------------------|
+| `mean(x)`                  | arithmetic mean                          |
+| `median(x)`                | median                                   |
+| `max(x)`, `min(x)`         | extremes; `range(x)` gives both          |
+| `sd(x)`                    | standard deviation (n − 1 denominator)   |
+| `var(x)`                   | variance (n − 1 denominator)             |
+| `quantile(x)`              | 0, 25, 50, 75, 100 % quantiles           |
+| `quantile(x, c(0.1, 0.9))` | custom quantiles                         |
+| `IQR(x)`                   | Q3 − Q1                                  |
+| `summary(x)`               | min, Q1, median, mean, Q3, max, NA count |
+
+### Missing values (NA)
+
+- Any `NA` in `x` makes `mean`, `median`, `max`, `min`, `sd`, `var`, `range`, `sum` return `NA`; `quantile` and `IQR` throw an error instead.
+- Fix: `mean(x, na.rm = TRUE)` — works for `mean`, `median`, `max`, `min`, `sd`, `var`, `quantile`, `range`, `sum`, `IQR`.
+- Exception: `cor(x, y, use = "complete.obs")` uses `use`, not `na.rm`.
+- `summary()` reports NA count without needing `na.rm`.
+- Count NAs: `sum(is.na(x))`.
+
+## 3. Categorical data
+
+| Function | Returns | Example |
+|----|----|----|
+| `table(x)` | counts per category | `table(msleep$vore)` |
+| `proportions(table(x))` | proportion per category (sums to 1) | `proportions(table(msleep$vore))` |
+| `table(x, y)` | contingency table (cross-tabulation) | `table(penguins$species, penguins$sex)` |
+| `proportions(tab, margin = 1)` | row proportions (`margin = 2` for columns) |  |
+| `levels(x)` | categories of a factor | `levels(penguins$species)` |
+| `unique(x)` | distinct values |  |
+
+Notes: - `proportions()` requires R ≥ 4.0; `prop.table()` is the older equivalent, same arguments. - `proportions()` takes a **table**, not the raw vector: `proportions(msleep$vore)` is wrong. - `table()` drops `NA` by default; include it with `table(x, useNA = "ifany")`. - Percentages: `round(100 * proportions(table(x)), 1)`.
+
+## Plotting Graphics
+
+Every plot is built from three required components:
+
+| Component | What it is | Where it goes |
+|----|----|----|
+| **Data** | data frame of observations | first argument of `ggplot()` |
+| **Aesthetics** | mappings from *variables* → visual properties (x, y, colour, size, shape, fill…) | `aes()` |
+| **Geoms** | geometric objects drawn (points, bars, boxes, lines…) | `geom_*()` |
+
+Optional layers added on top: labels (`labs`), scales (`scale_*`), facets (`facet_*`), coordinates (`coord_*`), themes (`theme_*`).
+
+## 2. Basic syntax
+
+``` r
+library(ggplot2)
+ 
+ggplot(data, aes(x = var1, y = var2)) +
+  geom_xxx() +
+  labs(...) +
+  scale_xxx() +
+  facet_wrap(~ group)
+```
+
+Rules:
+
+- Layers are combined with `+`. The `+` must be at the **end** of a line, not the start, otherwise R ends the expression early.
+
+- The first two unnamed arguments of `aes()` are x and y: `aes(sleep_total, sleep_rem)` ≡ `aes(x = sleep_total, y = sleep_rem)`.
+
+- Line break after each `+` is style only; the plot is unchanged.
+
+## 3. Common plot types
+
+| Plot | Data type | ggplot2 | Base R equivalent |
+|----|----|----|----|
+| Scatterplot | 2 numeric | `ggplot(d, aes(x, y)) + geom_point()` | `plot(d$x, d$y)` |
+| Boxplot | numeric by group | `ggplot(d, aes(group, y)) + geom_boxplot()` | `boxplot(y ~ group, data = d)` |
+| Histogram | 1 numeric | `ggplot(d, aes(x)) + geom_histogram()` | `hist(d$x)` |
+| Bar chart | 1 categorical (counts) | `ggplot(d, aes(cat)) + geom_bar()` | `barplot(table(d$cat))` |
+| Jittered points | overlay raw data | `+ geom_jitter(size = 0.5, alpha = 0.25)` | — |
+
+Notes: - `geom_bar()` counts rows per category itself; no y needed. - `geom_histogram()` defaults to 30 bins; set `bins =` or `binwidth =`. - Boxplot elements: median (line), Q1/Q3 (box edges), whiskers, outlier points. - **Correction to the source text:** in ggplot2, whiskers extend to the most extreme point **within 1.5 × IQR** of the box, not to the true min/max. Outliers are points beyond that. Outliers **are** included when computing the median and quartiles.
+
+## 4. Mapping vs setting (most important distinction)
+
+|   | Syntax | Meaning |
+|----|----|----|
+| **Mapping** (inside `aes`) | `aes(colour = vore)` | colour depends on a variable → legend created |
+| **Setting** (inside geom, outside `aes`) | `geom_point(colour = "red")` | fixed value for all points → no legend |
+
+Common mistake: `geom_point(aes(colour = "red"))` maps a constant string "red" as a category → points get default colour and a legend labelled "red".
+
+Mapping type behaviour: - Categorical variable → discrete colours/shapes. - Continuous variable → colour gradient (e.g. `colour = sleep_cycle`). `shape` cannot map a continuous variable.
+
+## 5. Visual properties (aesthetics)
+
+| Property | Applies to | Example |
+|----|----|----|
+| `colour` | points, lines, box/bar outlines | `aes(colour = species)` or `colour = "#FF5733"` |
+| `fill` | bars, boxes, histograms | `aes(fill = sex)` / `geom_bar(fill = "steelblue")` |
+| `shape` | points | `aes(shape = island)` |
+| `size` | points, lines | `aes(size = body_mass_g)` |
+| `alpha` | transparency, 0–1 | `geom_point(alpha = 0.25)` (useful for overplotting) |
+
+- Named colours: `colours()` lists 657. Hex codes also work.
+- Histogram/bar outline: `geom_histogram(colour = "black")` (outline = `colour`, interior = `fill`).
+- Bar width: `geom_bar(width = 0.5)`.
+
+## 6. Labels
+
+``` r
++ labs(x = "Total sleep time (h)",
+       y = "REM sleep (h)",
+       colour = "Feeding behaviour",   # legend title = name of the mapped aesthetic
+       title = "...")
+```
+
+## 7. Axis limits and scales
+
+| Goal | Code | Effect |
+|----|----|----|
+| Restrict range | `xlim(0, 1.5)` / `ylim()` | **removes** points outside range (they are dropped, with a warning; also affects stats like boxplots/smoothers) |
+| Zoom without dropping data | `coord_cartesian(xlim = c(0, 1.5))` | only changes the view (not in source text; usually preferable) |
+| Transform in aes | `aes(log(brainwt), ...)` | natural log; axis shows log values → harder to read |
+| Log scale | `scale_x_log10()` | data transformed, ticks shown on original scale → interpretable |
+| Avoid scientific notation | `options(scipen = 1000)` | global R option |
+
+Outliers that compress the plot (e.g. elephants in `brainwt`) → prefer a log scale over removing them.
+
+## 8. Comparing groups
+
+1.  **Colour/shape mapping** — groups in one panel: `aes(colour = vore)`.
+
+2.  **Facetting** — one panel per group, shared axes by default:
+
+    ``` r
+    + facet_wrap(~ vore)            # wraps panels
+    + facet_wrap(~ species, nrow = 2)
+    ```
+
+    Free axes: `facet_wrap(~ g, scales = "free")`. Two-variable grid: `facet_grid(rows ~ cols)`.
+
+3.  **Boxplots** — group on x, numeric on y.
+
+## 9. Bar chart layouts (position)
+
+``` r
+ggplot(penguins, aes(species, fill = sex)) + geom_bar()                     # stacked (default)
+ggplot(penguins, aes(species, fill = sex)) + geom_bar(position = "dodge")   # side by side
+ggplot(penguins, aes(species, fill = sex)) + geom_bar(position = "fill")    # proportions
+ggplot(msleep, aes(factor(1), fill = vore)) + geom_bar()                    # single stacked bar
++ coord_flip()                                                               # swap x and y
+```
+
+Modern alternative to `coord_flip()`: put the variable on y, e.g. `aes(y = species)`.
+
+## 10. Saving plots
+
+``` r
+p <- ggplot(msleep, aes(sleep_total, sleep_rem)) + geom_point()
+p                                   # display
+p + labs(x = "added later")         # plot objects can be extended
+ 
+ggsave("fig.pdf", p, width = 5, height = 5)            # inches by default
+ggsave("fig.png", p, width = 12, height = 10, units = "cm", dpi = 300)
+```
+
+- Without a plot argument, `ggsave` saves the last plot shown.
+
+- Format set by file extension: pdf, png, jpg, tif, eps, svg.
+
+- Base R / generic device approach:
+
+  ``` r
+  pdf("fig.pdf", width = 5, height = 5); print(p); dev.off()
+  ```
+
+  (Inside scripts/loops, use `print(p)`; auto-printing only happens at the console.)
+
+- Save by code, not the RStudio Export button → reproducible.
+
+## 11. Quick reference template
+
+``` r
+ggplot(df, aes(x = xvar, y = yvar, colour = group)) +
+  geom_point(alpha = 0.6, size = 2) +
+  scale_x_log10() +
+  facet_wrap(~ facet_var, nrow = 2) +
+  labs(x = "X label (unit)", y = "Y label (unit)", colour = "Group") +
+  theme_bw()
+```
+
+# Data Frames and Data Types
+
+## 1. Basic data types
+
+| Type | Example | Notes |
+|----|----|----|
+| `numeric` (double) | `1`, `16.823` | default for numbers |
+| `integer` | `1L`, `55L` | `L` suffix; `1:5` also gives integers |
+| `logical` | `TRUE`, `FALSE` | in arithmetic, `TRUE` = 1, `FALSE` = 0 |
+| `character` | `"Hello"`, `'Hello'` | single and double quotes are equivalent |
+| `complex` | `2+3i` | rarely used |
+| `raw` | bytes | rarely used |
+
+Special classes built on these: - `factor`: categorical data (integer codes + `levels`). - `POSIXct`: date-time.
+
+Check type: `class(x)`. Lower-level storage type: `typeof(x)` (e.g. `class(1)` = `"numeric"`, `typeof(1)` = `"double"`).
+
+### Type behaviour in operations
+
+| Expression | Result |
+|----|----|
+| `1 + 2` | numeric |
+| `1L + 2` | numeric (integer + double → double) |
+| `1L + 2L` | integer |
+| `TRUE + 1`, `FALSE * 2` | `2`, `0` (logical coerced to number) |
+| `"Hello" + 1` | **error**: non-numeric argument to binary operator |
+
+### Coercion in vectors
+
+A vector holds one type only. Mixed input is coerced to the most general type: logical → integer → numeric → character.
+
+``` r
+c(6, "Scotland", TRUE)    # all become character: "6" "Scotland" "TRUE"
+c(6, TRUE)                # numeric: 6 1
+```
+
+`class()` on an atomic vector returns the type of its elements.
+
+## 2. Table types
+
+| Class | Column types | Notes |
+|----|----|----|
+| `matrix` | all same type | low memory, fast computation; needed by some functions |
+| `data.frame` | can differ per column | base R standard |
+| `data.table` | can differ | enhanced data.frame (data.table package) |
+| `tbl_df` (tibble) | can differ | enhanced data.frame (tidyverse); e.g. `msleep` |
+
+Convention: each **column = variable**, each **row = observation**.
+
+Conversion:
+
+``` r
+as.data.frame(WorldPhones)   # matrix → data.frame
+as.matrix(airquality)        # data.frame → matrix (all columns coerced to one type)
+```
+
+Creating:
+
+``` r
+bookstore <- data.frame(age, purchase)      # from vectors of equal length
+matrix(1:6, nrow = 1)                       # 1 × 6
+matrix(1:6, nrow = 3, ncol = 2)             # filled column-wise by default
+matrix(1:6, nrow = 3, byrow = TRUE)         # filled row-wise
+```
+
+Inspect: `ncol`, `nrow`, `dim`, `names`, `row.names`, `View(df)`.
+
+## 3. Accessing data
+
+### Vectors
+
+``` r
+airquality$Temp          # column as vector
+airquality$Temp[5]       # 5th element (indexing starts at 1)
+```
+
+### `[i, j]` indexing (row i, column j)
+
+| Code                      | Returns                    |
+|---------------------------|----------------------------|
+| `df[5, 4]`                | element at row 5, column 4 |
+| `df[5, ]`                 | row 5                      |
+| `df[, 4]`                 | column 4                   |
+| `df[[4]]`                 | column 4 as vector         |
+| `df[1:5, ]`               | rows 1–5                   |
+| `df[, c(2, 4, 6)]`        | columns 2, 4, 6            |
+| `df[, -2]`                | all columns except 2       |
+| `df[, -c(3, 4)]`          | all except columns 3 and 4 |
+| `df[, c("Temp", "Wind")]` | columns by name            |
+
+- Leaving `i` or `j` empty means "all". `df[, 3]` is column 3, not row 3.
+- Negative indices exclude; they cannot be used with names (`df[, -"Temp"]` fails). Use `df[, !names(df) %in% c("Temp", "Wind")]`.
+- **Tibble difference:** `df[, 4]` returns a 1-column **tibble**, not a vector. Use `df[[4]]` or `df$Temp` to get a vector in both cases.
+
+## 4. Modifying data
+
+``` r
+bookstore$age[2] <- 18                 # change one element
+bookstore[2, 1] <- 18                  # same, by position
+bookstore$age <- bookstore$age * 12    # change whole column
+bookstore$visit_length <- c(5, 2, 20, 22, 12, 31, 9, 10, 11)   # new column (length must equal nrow)
+bookstore$rev_per_minute <- bookstore$purchase / bookstore$visit_length  # derived column
+bookstore$purchase[bookstore$age == 80] <- 16   # change by condition
+```
+
+## 5. Filtering with conditions
+
+### Locating extremes
+
+``` r
+max(airquality$Temp)
+which.max(airquality$Temp)               # index of first maximum
+airquality[which.max(airquality$Temp), ] # whole row
+which.min(...)                           # analogous
+```
+
+### Comparison and logical operators
+
+| Operator             | Meaning                                           |
+|----------------------|---------------------------------------------------|
+| `==`, `!=`           | equal, not equal                                  |
+| `>`, `<`, `>=`, `<=` | comparisons                                       |
+| `%in%`               | matches any element of a set: `a %in% c(1, 4, 9)` |
+| `is.na(x)`           | is missing                                        |
+| `&`, `\|`            | element-wise AND, OR                              |
+| `!`                  | NOT                                               |
+| `xor(a, b)`          | exactly one is TRUE                               |
+
+Do not test NA with `x == NA` (always returns `NA`); use `is.na(x)`.
+
+### Filtering rows
+
+``` r
+airquality$Temp > 90                      # logical vector
+airquality[airquality$Temp > 90, ]        # rows where TRUE
+subset(airquality, Temp > 90)             # same, no df$ needed
+airquality[airquality$Temp < 70 & airquality$Wind > 10, ]
+airquality$Hot <- airquality$Temp > 90    # store condition as column
+```
+
+**NA pitfall:** if the condition column has `NA` (e.g. `Ozone`), `df[df$Ozone > 50, ]` returns extra all-`NA` rows. `subset()` and `which()` drop them:
+
+``` r
+airquality[which(airquality$Ozone > 50), ]
+subset(airquality, Ozone > 50)
+```
+
+### Summarising a condition
+
+| Code            | Returns                         |
+|-----------------|---------------------------------|
+| `which(cond)`   | indices where TRUE (NA ignored) |
+| `all(cond)`     | TRUE if all are TRUE            |
+| `any(cond)`     | TRUE if at least one is TRUE    |
+| `sum(cond)`     | number of TRUE (TRUE = 1)       |
+| `mean(cond)`    | proportion TRUE                 |
+| `sum(is.na(x))` | number of missing values        |
+
+`sum`, `mean`, `all`, `any` return `NA` if the condition contains `NA`; add `na.rm = TRUE`.
+
+## 6. Numeric → categorical: `cut`
+
+``` r
+airquality$TempCat <- cut(airquality$Temp, breaks = c(50, 70, 90, 110))
+# intervals (50,70], (70,90], (90,110] — right-closed by default
+```
+
+- `right = FALSE` gives `[50,70)` etc.
+- `labels = c("Cold", "Mild", "Hot")` names the categories.
+- Values outside the breaks become `NA`.
+- Result is a factor.
+
+# Grouped summaries, pipes
+
+# 1. Grouped summaries in base R
+
+### `aggregate`: formula interface
+
+``` r
+aggregate(Temp ~ Month, data = airquality, FUN = mean)                  # one variable
+aggregate(cbind(Temp, Wind) ~ Month, data = airquality, FUN = sd)       # several variables
+aggregate(Temp ~ Month + Day, data = airquality, FUN = mean)            # several grouping variables
+aggregate(Temp ~ Month, data = airquality, FUN = length)                # count per group
+```
+
+- Formula `y ~ group`: summarise `y` for each level of `group`.
+- `data =`: the data frame; `FUN =`: the summary function.
+- **NA handling:** the formula method uses `na.action = na.omit`, which removes rows with `NA` **before** summarising, so `mean` does not return `NA`.
+  - With `cbind(a, b) ~ g`, a row is dropped if **any** listed variable is `NA`, so the summary of `b` can lose rows where only `a` was missing.
+  - Counting with `length` therefore counts only non-NA rows; use a variable without NA (e.g. `Temp`) to count all observations.
+
+### `by`: functions that take several variables
+
+``` r
+by(airquality$Temp, airquality$Month, mean)          # same result as aggregate, less tidy output
+by(airquality[, 3:4], airquality$Month, cor)         # correlation matrix of Wind & Temp per month
+```
+
+- `by(data, INDICES, FUN)`: splits `data` by `INDICES` and applies `FUN` to each part.
+- Use it when `FUN` needs a data frame or several columns (e.g. `cor`), which `aggregate` cannot do easily.
+
+## 2. The native pipe `|>`
+
+Requires R ≥ 4.1. Passes the left-hand result as the **first argument** of the right-hand function.
+
+``` r
+f2(f1(x))            # read inside out
+x |> f1() |> f2()    # read left to right: "x, then f1, then f2"
+```
+
+Right assignment `->` keeps the left-to-right flow:
+
+``` r
+x |> f1() |> f2() -> result
+```
+
+RStudio shortcut: `Ctrl+Shift+M`. If it inserts `%>%`: Tools → Global Options → Code → tick "Use native pipe operator".
+
+### `|>` vs `%>%`
+
+|   | `\|>` | `%>%` |
+|----|----|----|
+| Source | base R (≥ 4.1) | magrittr (loaded by dplyr) |
+| Needs package | no | yes |
+| Placeholder | `_` (named argument only) | `.` |
+| Speed | slightly faster (difference negligible in practice) |  |
+
+## 3. dplyr verbs for pipelines
+
+Load first: `library(dplyr)`. Otherwise you get "could not find function", or base `stats::filter` runs instead of dplyr's.
+
+| Verb | Purpose | Example |
+|----|----|----|
+| `filter()` | keep rows meeting a condition | `filter(airquality, Temp > 80)` |
+| `mutate()` | add or modify columns | `mutate(airquality, Wind = Wind * 0.44704)` |
+| `group_by()` | define groups for later steps | `group_by(airquality, Month)` |
+| `summarise()` / `summarize()` | one row per group | `summarise(df, m = mean(Wind))` |
+
+- Column names are looked up inside the data frame given as the first argument, so there is no `df$` (same idea as `aes()` in ggplot2).
+- `summarise(mean(x))` does **not** remove NA automatically, unlike `aggregate`; use `mean(x, na.rm = TRUE)`.
+
+### Full pipeline
+
+``` r
+airquality |>
+  filter(Temp > 80) |>
+  mutate(Wind = Wind * 0.44704) |>        # mph → m/s
+  group_by(Month) |>
+  summarise(Mean_wind_speed = mean(Wind)) -> hot_wind_means
+```
+
+Equivalent base R:
+
+``` r
+aggregate(Wind * 0.44704 ~ Month, data = airquality[airquality$Temp > 80, ], FUN = mean)
+```
+
+New column with a pipe (Exercise 2.29):
+
+``` r
+bookstore |> mutate(rev_per_minute = purchase / visit_length) -> bookstore
+```
+
+### Errors in the book's step-by-step version
+
+The book's code:
+
+``` r
+airquality2 <- filter(airquality, Temp > 80)
+airquality2 <- mutate(airquality, Wind = Wind * 0.44704)    # BUG: uses airquality, discards the filter
+airquality <- group_by(airquality, Month)                   # BUG: unfiltered data; overwrites the original dataset
+hot_wind_means <- summarise(airquality, Mean_wind_speed = mean(Wind))
+```
+
+Correct version:
+
+``` r
+airquality2 <- filter(airquality, Temp > 80)
+airquality2 <- mutate(airquality2, Wind = Wind * 0.44704)
+airquality2 <- group_by(airquality2, Month)
+hot_wind_means <- summarise(airquality2, Mean_wind_speed = mean(Wind))
+```
+
+This shows one advantage of pipes: no intermediate objects to mix up or overwrite.
+
+## 4. When the data is not the first argument
+
+### `with()`: function takes vectors, not a data frame
+
+``` r
+msleep |> cor(sleep_total, sleep_rem, use = "complete.obs")          # error: data frame passed as x
+msleep |> with(cor(sleep_total, sleep_rem, use = "complete.obs"))    # works
+```
+
+`with(df, expr)` evaluates `expr` with the columns of `df` available by name.
+
+### Placeholder `_`: data argument is not first
+
+``` r
+airquality |> aggregate(Temp ~ Month, data = _, FUN = mean)
+```
+
+- `_` = the left-hand output.
+- Rules (native pipe): R ≥ 4.2, must be passed to a **named** argument (`data = _`, not just `_`), and can appear only once.

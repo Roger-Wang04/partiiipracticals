@@ -1,0 +1,151 @@
+---
+title: "practical"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+```{r}
+first8 <- c(37,52,65,89,24,19,54,67)
+patients <- tibble (
+  dose = rep(first8, times = 10),
+  ER = rep(c(TRUE,FALSE), each = 40)
+)
+beta0 <- 3
+beta.er <- 2
+beta.dose <- 0.1
+```
+
+```{r}
+X <- model.matrix(~ER + dose, data = patients)
+X.int <- model.matrix(~ER * dose, data = patients)
+
+head(X)
+head(X.int)
+```
+
+```{r}
+beta <- c(beta0, beta.er, beta.dose)
+Y <- X %*% beta
+head(Y)
+
+```
+
+```{r}
+ggplot(patients, aes(x = dose, y = Y, colour = ER)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+set.seed(123)
+Y.OBS <- Y + rnorm(length(Y))
+ggplot(patients, aes(x = dose, y = Y.OBS, colour = ER)) +
+  geom_point() +
+  geom_smooth(method = 'lm')
+```
+
+```{r}
+beta.OBS <-  solve(t(X) %*% X, t(X) %*% Y.OBS)
+print(beta.OBS)
+```
+
+```{r}
+patients$Y.OBS <- as.numeric(Y.OBS)
+fit <- lm(Y.OBS ~ ER + dose, data = patients)
+print(summary(fit))
+print(confint(fit, level = 0.90))
+```
+
+```{r}
+set.seed(123)
+N <- 10000
+included.dose <- numeric(N)
+
+for (i in 1:N) {
+  tmp <- as.numeric(Y) + rnorm(80, mean = 0, sd = 1)
+  res <- summary(lm(tmp ~ ER + dose, data = patients))$coefficients["dose", 4]
+  included.dose[i] <- (res < 0.05)
+}
+
+mean(included.dose)
+```
+
+```{r}
+m1 <- lm(Y.OBS ~ ER + dose, data = patients)
+m2 <- lm(Y.OBS ~ ER, data = patients)
+
+anova(m1,m2)
+m <- lm(Y.OBS ~ 1, data = patients)
+anova(m1, m)
+```
+
+```{r}
+x <- runif(1000, min=1, max = 10)
+y <- exp(1/x)
+plot(x,y)
+e <- rnorm(1000, mean = 0, 0.25)
+yobs <-  y + e
+plot(x,yobs)
+```
+
+```{r}
+expfit <- lm(yobs ~ x)
+summary(expfit)
+plot(x, residuals(expfit))
+```
+
+```{r}
+expfit  <- lm(yobs ~ x)
+expfit2 <- lm(yobs ~ x + I(x^2))
+expfit3 <- lm(yobs ~ x + I(x^2) + I(x^3))
+
+anova(expfit, expfit2, expfit3)
+```
+
+```{r }
+ggplot() +
+  geom_line(aes(x = x, y = fitted(expfit),  colour = "expfit"))  +
+  geom_line(aes(x = x, y = fitted(expfit2), colour = "expfit2")) +
+  geom_line(aes(x = x, y = fitted(expfit3), colour = "expfit3")) +
+  geom_point(aes(x = x, y = yobs, colour = "observed"))
+```
+
+```{r}
+realfit <- lm(yobs ~ I(exp(1/x)))
+print(anova(expfit, expfit2, expfit3, realfit))
+
+ggplot() +
+  geom_line(aes(x = x, y = fitted(expfit),  colour = "expfit"))  +
+  geom_line(aes(x = x, y = fitted(expfit2), colour = "expfit2")) +
+  geom_line(aes(x = x, y = fitted(expfit3), colour = "expfit3")) +
+  geom_point(aes(x = x, y = yobs, colour = "observed")) +
+  geom_line(aes(x = x, y = fitted(realfit), colour = "realfit"))
+```
+
+```{r}
+m4 <- loess(yobs ~ x)
+summary(m4)
+plot(x, yobs)
+points(x, fitted(m4), col = 2)
+```
+
+# Covid-19 Data
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+covid19 <- read_csv("ClassCOVIDData.csv")
+covid19$icu <- factor(covid19$icu, levels = c(0, 1), labels = c("No", "Yes"))
+covid19$sex <- factor(covid19$sex)  # recode labels here too if you know the coding
+```
+
+```{r}
+summary(covid19)
+ggplot(covid19, aes(x = age, fill = icu)) +
+  geom_histogram(bins = 30, position = "identity", alpha = 0.5)
+```
